@@ -23,6 +23,9 @@ except Exception:
 
 APP_TITLE = "PNG 转 JPG"
 
+# 接受常见图片格式作为「转换 / 压缩」的输入
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff", ".webp", ".tga"}
+
 
 # ---------------- 核心转换 ----------------
 
@@ -34,7 +37,7 @@ def resource_dir() -> Path:
 
 
 def convert_one(src: Path, dst: Path, quality: int) -> None:
-    """把单个 PNG 转成 JPG。透明区域自动填充白色。"""
+    """把单张图片转成 JPG（透明区域填白）；JPG 重新编码即压缩。"""
     img = Image.open(src)
     img.load()
     if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
@@ -120,11 +123,11 @@ class App:
         header = ttk.Frame(self.body, padding=(18, 14, 18, 4))
         header.pack(fill="x")
         ttk.Label(header, text="PNG → JPG", font=("Microsoft YaHei UI", 16, "bold")).pack(side="left")
-        ttk.Label(header, text="  选文件 → 调质量 → 一键转换",
+        ttk.Label(header, text="  选图片 → 调质量 → 一键转换 / 压缩",
                   foreground="#8a8f99").pack(side="left", pady=(6, 0))
 
-        hint_text = ("提示：可以直接把 PNG 文件或整个文件夹拖进窗口"
-                     if HAVE_DND else "提示：点击下方按钮选择 PNG 文件")
+        hint_text = ("提示：可以直接把图片（PNG / JPG 等）或整个文件夹拖进窗口"
+                     if HAVE_DND else "提示：点击下方按钮选择图片（PNG / JPG 等）")
         ttk.Label(self.body, text=hint_text, foreground="#9aa0a8",
                   padding=(20, 0)).pack(anchor="w")
 
@@ -243,13 +246,18 @@ class App:
 
     def add_files(self) -> None:
         paths = filedialog.askopenfilenames(
-            title="选择 PNG 文件",
-            filetypes=[("PNG 图片", "*.png"), ("所有文件", "*.*")],
+            title="选择图片文件（PNG / JPG 等）",
+            filetypes=[
+                ("图片文件", "*.png *.jpg *.jpeg *.bmp *.gif *.tif *.tiff *.webp *.tga"),
+                ("PNG 图片", "*.png"),
+                ("JPG 图片", "*.jpg *.jpeg"),
+                ("所有文件", "*.*"),
+            ],
         )
         self._add_paths(paths)
 
     def add_folder(self) -> None:
-        d = filedialog.askdirectory(title="选择文件夹（将添加其中所有 PNG）")
+        d = filedialog.askdirectory(title="选择文件夹（将添加其中所有图片）")
         if d:
             self._add_paths([d])
 
@@ -258,9 +266,12 @@ class App:
         for p in paths:
             p = Path(p)
             if p.is_dir():
-                added += self._add_paths(sorted(p.rglob("*.png")))
+                added += self._add_paths(sorted(
+                    x for x in p.rglob("*")
+                    if x.is_file() and x.suffix.lower() in IMAGE_EXTS
+                ))
                 continue
-            if p.suffix.lower() != ".png" or not p.is_file():
+            if p.suffix.lower() not in IMAGE_EXTS or not p.is_file():
                 continue
             if p in self.files:
                 continue
